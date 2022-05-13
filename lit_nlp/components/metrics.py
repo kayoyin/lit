@@ -58,6 +58,7 @@ def map_pred_keys(
   return ret
 
 
+# TODO(b/232923252): Replace with classification interpreter use.
 def get_margin_for_input(margin_config: Optional[JsonDict] = None,
                          inp: Optional[JsonDict] = None):
   """Get margin given a margin config and input example."""
@@ -88,6 +89,7 @@ def get_margin_for_input(margin_config: Optional[JsonDict] = None,
   return 0
 
 
+# TODO(b/232923252): Replace with classification interpreter use.
 def get_classifications(
     preds: Sequence[np.ndarray], pred_spec: types.MulticlassPreds,
     margin_config: Optional[Sequence[float]] = None) -> Sequence[int]:

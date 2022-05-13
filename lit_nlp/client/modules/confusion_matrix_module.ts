@@ -28,9 +28,9 @@ import {MatrixCell, MatrixSelection} from '../elements/data_matrix';
 import {ReactiveElement} from '../lib/elements';
 import {IndexedInput, ModelInfoMap} from '../lib/types';
 import {doesOutputSpecContain, facetMapToDictKey, findSpecKeys} from '../lib/utils';
-import {ClassificationInfo} from '../services/classification_service';
+import {CalculatedColumnType} from '../services/data_service';
 import {GetFeatureFunc, GroupService, FacetingMethod, NumericFeatureBins} from '../services/group_service';
-import {ClassificationService} from '../services/services';
+import {DataService} from '../services/services';
 
 import {styles} from './confusion_matrix_module.css';
 import {styles as sharedStyles} from '../lib/shared_styles.css';
@@ -64,8 +64,8 @@ export class ConfusionMatrixModule extends LitModule {
     return [sharedStyles, styles];
   }
 
-  private readonly classificationService =
-      app.getService(ClassificationService);
+  private readonly dataService =
+      app.getService(DataService);
   private readonly groupService = app.getService(GroupService);
 
   @observable verticalColumnLabels = false;
@@ -162,6 +162,8 @@ export class ConfusionMatrixModule extends LitModule {
     // Get all preds fields and their parents
     const models = this.appState.currentModels;
     const options: CmatOption[] = [];
+    // tslint:disable:no-unused-variable Causes recompute on change.
+    const data = this.dataService.dataVals;
 
     // From the data, we can bin by any categorical feature.
     const categoricalFeatures = this.groupService.categoricalFeatures;
@@ -194,16 +196,11 @@ export class ConfusionMatrixModule extends LitModule {
         }
         // Preds for this key.
         const predsRunner = async (dataset: IndexedInput[]) => {
-          const preds = await this.classificationService.getClassificationPreds(
-              dataset, model, this.appState.currentDataset);
-          const classPromises = preds.map(
-              async (d: {[key: string]: number[]}, i: number) =>
-                  this.classificationService.getResults(
-                      [dataset[i].id], model, predKey));
-          const classResults = await Promise.all(classPromises);
-          return classResults.map(
-              (info: ClassificationInfo[]) =>
-                  labelList[info[0].predictedClassIdx]);
+          const key = this.dataService.getColumnName(
+              model, predKey, CalculatedColumnType.PREDICTED_CLASS);
+          const predClasses = dataset.map(
+              datapoint => this.dataService.getVal(datapoint.id, key));
+          return predClasses;
         };
         options.push({
           name: `${model}:${predKey}`,

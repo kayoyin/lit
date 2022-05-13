@@ -25,13 +25,20 @@ import {LitModule} from '../core/lit_module';
 import {TableData} from '../elements/table';
 import {IndexedInput, ModelInfoMap, Spec} from '../lib/types';
 import {doesOutputSpecContain, findSpecKeys} from '../lib/utils';
-import {RegressionService} from '../services/services';
+import {CalculatedColumnType} from '../services/data_service';
+import {DataService} from '../services/services';
 
 import {styles} from './regression_module.css';
 import {styles as sharedStyles} from '../lib/shared_styles.css';
 
+
 interface RegressionResult {
-  [key: string]: number;
+  score: number;
+  error: number;
+}
+
+interface RegressionResults {
+  [key: string]: RegressionResult;
 }
 
 /**
@@ -51,16 +58,16 @@ export class RegressionModule extends LitModule {
     return [sharedStyles, styles];
   }
 
-  private readonly regressionService = app.getService(RegressionService);
-
-  @observable private result: RegressionResult|null = null;
+  private readonly dataService = app.getService(DataService);
+  @observable private result: RegressionResults|null = null;
 
   override firstUpdated() {
-    const getPrimarySelectedInputData = () =>
-        this.selectionService.primarySelectedInputData;
+    const getSelectionChanges = () =>
+        [this.selectionService.primarySelectedInputData,
+         this.dataService.dataVals];
     this.reactImmediately(
-        getPrimarySelectedInputData, primarySelectedInputData => {
-          this.updateSelection(primarySelectedInputData);
+        getSelectionChanges, () => {
+          this.updateSelection(this.selectionService.primarySelectedInputData);
         });
   }
 
@@ -70,25 +77,19 @@ export class RegressionModule extends LitModule {
       return;
     }
 
-    const dataset = this.appState.currentDataset;
-    const promise = this.regressionService.getRegressionPreds(
-        [inputData], this.model, dataset);
-
-    const results = await this.loadLatest('regressionPreds', promise);
-    if (results === null || results.length === 0) {
-      this.result = null;
-      return;
+    const result: RegressionResults = {};
+    const spec = this.appState.getModelSpec(this.model);
+    const scoreFields: string[] = findSpecKeys(spec.output, 'RegressionScore');
+    for (const key of scoreFields) {
+      const predKey = this.dataService.getColumnName(this.model, key);
+      const errorKey = this.dataService.getColumnName(
+          this.model, key, CalculatedColumnType.ERROR);
+      result[key] = {
+        score: this.dataService.getVal(inputData.id, predKey),
+        error: this.dataService.getVal(inputData.id, errorKey)
+      };
     }
-
-    // Extract the single result, as this only is for a single input.
-    const keys = Object.keys(results[0]);
-    for (const key of keys) {
-      const regressionInfo = (await this.regressionService.getResults(
-          [inputData.id], this.model, key))[0];
-      results[0][this.regressionService.getErrorKey(key)] =
-          regressionInfo.error;
-    }
-    this.result = results[0];
+    this.result = result;
   }
 
   override render() {
@@ -108,9 +109,9 @@ export class RegressionModule extends LitModule {
     // Per output, display score, and parent field and error if available.
     for (const scoreField of scoreFields) {
       // Add new row for each output from the model.
-      const score = result[scoreField] == null ?
+      const score = result[scoreField] == null || result[scoreField].score == null ?
           '' :
-          result[scoreField].toFixed(4);
+          result[scoreField].score.toFixed(4);
       // Target score to compare against.
       const parentField = spec.output[scoreField].parent! || '';
       const parentScore = input.data[parentField] == null ?
@@ -118,8 +119,7 @@ export class RegressionModule extends LitModule {
           input.data[parentField].toFixed(4);
       let errorScore = '';
       if (parentField && parentScore) {
-        const error =
-            result[this.regressionService.getErrorKey(scoreField)];
+        const error = result[scoreField].error;
         if (error != null) {
           hasParent = true;
           errorScore = error.toFixed(4);

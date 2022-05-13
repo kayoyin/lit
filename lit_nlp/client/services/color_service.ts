@@ -22,11 +22,9 @@ import {computed, observable, reaction} from 'mobx';
 import {ColorOption, D3Scale, IndexedInput} from '../lib/types';
 import {DEFAULT, CATEGORICAL_NORMAL, CONTINUOUS_UNSIGNED_LAB, CONTINUOUS_SIGNED_LAB, MULTIHUE_CONTINUOUS} from '../lib/colors';
 
-import {ClassificationService} from './classification_service';
 import {DataService} from './data_service';
 import {GroupService} from './group_service';
 import {LitService} from './lit_service';
-import {RegressionService} from './regression_service';
 import {AppState} from './state_service';
 
 /** Color map for salience maps. */
@@ -101,8 +99,6 @@ export class ColorService extends LitService {
   constructor(
       private readonly appState: AppState,
       private readonly groupService: GroupService,
-      private readonly classificationService: ClassificationService,
-      private readonly regressionService: RegressionService,
       private readonly dataService: DataService) {
     super();
     reaction(() => this.appState.currentModels, currentModels => {
@@ -128,16 +124,28 @@ export class ColorService extends LitService {
   get all() {
     return [
       this.selectedColorOption,
-      this.classificationService.allMarginSettings
     ];
   }
 
   @computed
   get colorableOptions() {
+    // tslint:disable:no-unused-variable Causes recompute on change.
+    const data = this.dataService.dataVals;
     const catInputFeatureOptions =
         this.groupService.categoricalFeatureNames.map((feature: string) => {
           const domain = this.groupService.categoricalFeatures[feature];
           const range = domain.length > 1 ? CATEGORICAL_NORMAL : [ DEFAULT ];
+          return {
+            name: feature,
+            getValue: (input: IndexedInput) =>
+              this.dataService.getVal(input.id, feature),
+            scale: d3.scaleOrdinal(range).domain(domain) as D3Scale
+          };
+        });
+    const boolInputFeatureOptions =
+        this.groupService.booleanFeatureNames.map((feature: string) => {
+          const domain = ["false", "true"];
+          const range = CATEGORICAL_NORMAL;
           return {
             name: feature,
             getValue: (input: IndexedInput) =>
@@ -157,9 +165,7 @@ export class ColorService extends LitService {
           };
         });
     return [
-      ...catInputFeatureOptions, ...numInputFeatureOptions,
-      ...this.classificationService.colorOptions,
-      ...this.regressionService.colorOptions, this.defaultOption
+      ...catInputFeatureOptions, ...numInputFeatureOptions, ...boolInputFeatureOptions, this.defaultOption
     ];
   }
 

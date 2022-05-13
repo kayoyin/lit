@@ -29,6 +29,7 @@ from lit_nlp.api import layout
 from lit_nlp.api import model as lit_model
 from lit_nlp.api import types
 from lit_nlp.components import ablation_flip
+from lit_nlp.components import classification_results
 from lit_nlp.components import curves
 from lit_nlp.components import gradient_maps
 from lit_nlp.components import hotflip
@@ -40,6 +41,7 @@ from lit_nlp.components import nearest_neighbors
 from lit_nlp.components import pca
 from lit_nlp.components import pdp
 from lit_nlp.components import projection
+from lit_nlp.components import regression_results
 from lit_nlp.components import salience_clustering
 from lit_nlp.components import scrambler
 from lit_nlp.components import shap_explainer
@@ -502,6 +504,8 @@ class LitApp(object):
           'Salience Clustering': salience_clustering.SalienceClustering(
               gradient_map_interpreters),
           'Tabular SHAP': shap_explainer.TabularShapExplainer(),
+          'classification': classification_results.ClassificationInterpreter(),
+          'regression': regression_results.RegressionInterpreter(),
           # Embedding projectors expose a standard interface, but get special
           # handling so we can precompute the projections if requested.
           'pca': projection.ProjectionManager(pca.PCAModel),
